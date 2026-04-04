@@ -12,6 +12,7 @@
   --border:rgba(26,24,20,0.09);--border-md:rgba(26,24,20,0.16);
   --b-bg:#FFF4E6;--b-txt:#7A4F1E;--b-dot:#E8943A;
   --l-bg:#EAF5EC;--l-txt:#1F5C2E;--l-dot:#3DA64A;
+  --s-bg:#FFF0F5;--s-txt:#8A2558;--s-dot:#E05A9D;
   --d-bg:#EDE8FB;--d-txt:#3D2C8A;--d-dot:#6D4FF0;
   --accent:#6D4FF0;--accent-lt:#EDE8FB;--accent-mid:#A58AF5;
   --r:14px;--rs:8px;
@@ -49,6 +50,7 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
 .pill{font-size:10px;padding:2px 6px;border-radius:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.55}
 .pill.b{background:var(--b-bg);color:var(--b-txt)}
 .pill.l{background:var(--l-bg);color:var(--l-txt)}
+.pill.s{background:var(--s-bg);color:var(--s-txt)}
 .pill.d{background:var(--d-bg);color:var(--d-txt)}
 .right-panel{border-left:1px solid var(--border);background:var(--white);display:flex;flex-direction:column;height:calc(100vh - 60px);position:sticky;top:60px;overflow:hidden}
 .detail-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -123,6 +125,7 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--b-dot)"></div>Breakfast</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--l-dot)"></div>Lunch</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--s-dot)"></div>Snacks</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--d-dot)"></div>Dinner</div>
     </div>
     <div class="cal-grid" id="calGrid"></div>
@@ -134,7 +137,7 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
       <div class="detail-hint" id="detailHint">Click any date to see your meals</div>
     </div>
     <div class="detail-body" id="detailBody">
-      <div class="no-date">Click a date to view breakfast, lunch and dinner for that day</div>
+      <div class="no-date">Click a date to view breakfast, lunch, snacks and dinner for that day</div>
     </div>
 
     <div class="chat-wrap">
@@ -143,12 +146,13 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
         Meal Assistant
       </div>
       <div class="chat-msgs" id="chatMsgs">
-        <div class="msg bot">Hey! Tell me what you ate and I'll log it — try <em>"We had porridge for breakfast this morning"</em> or <em>"Chicken wrap for lunch yesterday"</em>. You can also ask what you had on any day!</div>
+        <div class="msg bot">Hey! Tell me what you ate and I'll log it — try <em>"We had porridge for breakfast this morning"</em> or <em>"Fruit and nuts for snacks this afternoon"</em>. You can also ask what you had on any day!</div>
       </div>
       <div class="chips">
         <button class="chip" onclick="quickFill('What did we eat today?')">What did we eat today?</button>
         <button class="chip" onclick="quickFill('Log breakfast today: ')">+ Breakfast</button>
         <button class="chip" onclick="quickFill('Log lunch today: ')">+ Lunch</button>
+        <button class="chip" onclick="quickFill('Log snacks today: ')">+ Snacks</button>
         <button class="chip" onclick="quickFill('Log dinner today: ')">+ Dinner</button>
       </div>
       <div class="chat-input-row">
@@ -259,8 +263,8 @@ function addCell(grid,dayNum,otherM,isToday,key){
   cell.appendChild(numEl);
   if(key&&meals[key]){
     const pd=document.createElement('div'); pd.className='pills';
-    ['breakfast','lunch','dinner'].forEach(t=>{
-      if(meals[key][t]){ const p=document.createElement('div'); p.className='pill '+t[0]; p.textContent=meals[key][t]; pd.appendChild(p); }
+    [['breakfast','b'],['lunch','l'],['snacks','s'],['dinner','d']].forEach(([t,cls])=>{
+      if(meals[key][t]){ const p=document.createElement('div'); p.className='pill '+cls; p.textContent=meals[key][t]; pd.appendChild(p); }
     });
     cell.appendChild(pd);
   }
@@ -278,7 +282,7 @@ function renderDetail(key,day){
   document.getElementById('detailHint').textContent=meals[key]&&Object.keys(meals[key]).length?'Meals logged for this day':'No meals logged yet — use the chat below!';
   const body=document.getElementById('detailBody');
   body.innerHTML='';
-  [['breakfast','Breakfast','var(--b-dot)'],['lunch','Lunch','var(--l-dot)'],['dinner','Dinner','var(--d-dot)']].forEach(([t,lbl,dot])=>{
+  [['breakfast','Breakfast','var(--b-dot)'],['lunch','Lunch','var(--l-dot)'],['snacks','Snacks','var(--s-dot)'],['dinner','Dinner','var(--d-dot)']].forEach(([t,lbl,dot])=>{
     const food=meals[key]?.[t];
     const delBtn=food?`<button class="del-btn" onclick="deleteMeal('${key}','${t}')" title="Remove">✕</button>`:'';
     body.innerHTML+=`<div class="meal-row"><div class="meal-row-hdr"><div class="meal-row-left"><div class="row-dot" style="background:${dot}"></div><div class="row-label">${lbl}</div></div>${delBtn}</div><div class="meal-val ${food?'':'empty'}">${food||'Nothing logged yet'}</div></div>`;

@@ -67,6 +67,12 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
 .del-btn:hover{background:#FEE2E2;color:#DC2626}
 .meal-val{background:var(--cream);border-radius:var(--rs);padding:10px 12px;font-size:13.5px;line-height:1.55;min-height:40px;display:flex;align-items:center}
 .meal-val.empty{color:var(--muted);font-style:italic;font-size:12.5px}
+.meal-actions{display:flex;align-items:center;gap:6px}
+.save-btn{font-size:11px;color:var(--accent);background:transparent;border:1px solid var(--accent-mid);cursor:pointer;padding:2px 8px;border-radius:12px;transition:all .12s}
+.save-btn:hover{background:var(--accent-lt)}
+.meal-input{width:100%;background:var(--cream);border:1px solid transparent;border-radius:var(--rs);padding:10px 12px;font-size:13.5px;line-height:1.55;min-height:40px;font-family:'DM Sans',sans-serif;color:var(--ink);resize:vertical;outline:none;transition:border-color .12s,background .12s}
+.meal-input::placeholder{color:var(--muted);font-style:italic;font-size:12.5px}
+.meal-input:focus{border-color:var(--accent-mid);background:#fff}
 .no-date{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13.5px;font-style:italic;text-align:center;padding:2rem}
 .chat-wrap{border-top:1px solid var(--border);display:flex;flex-direction:column;max-height:320px;flex-shrink:0}
 .chat-hdr{padding:9px 1.5rem;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -232,6 +238,50 @@ async function deleteMeal(date, mealType){
   finally{ setSyncing(false); }
 }
 
+async function saveMeal(date, mealType, food){
+  const value=food.trim();
+  if(!value){
+    if(meals[date]?.[mealType]) await deleteMeal(date, mealType);
+    else showToast('Nothing to save');
+    return;
+  }
+
+  setSyncing(true);
+  try{
+    const res=await fetch(`${API_BASE}/api/meals`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({date, meal_type:mealType, food:value})
+    });
+    if(!res.ok) throw new Error();
+
+    if(!meals[date]) meals[date]={};
+    meals[date][mealType]=value;
+    buildCalendar();
+    if(selDate===date){ const [,, d]=date.split('-'); renderDetail(date,parseInt(d)); }
+    showToast(`${mealType.charAt(0).toUpperCase()+mealType.slice(1)} saved`);
+  }catch{
+    showToast('Failed to save meal');
+  }finally{
+    setSyncing(false);
+  }
+}
+
+function escHtml(v){
+  return String(v)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#39;');
+}
+
+function saveMealFromInput(date, mealType){
+  const input=document.getElementById(`meal-input-${mealType}`);
+  if(!input) return;
+  saveMeal(date, mealType, input.value);
+}
+
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function buildCalendar(){
   document.getElementById('monthTitle').textContent=`${MONTHS[curMonth]} ${curYear}`;
@@ -285,7 +335,7 @@ function renderDetail(key,day){
   [['breakfast','Breakfast','var(--b-dot)'],['lunch','Lunch','var(--l-dot)'],['snacks','Snacks','var(--s-dot)'],['dinner','Dinner','var(--d-dot)']].forEach(([t,lbl,dot])=>{
     const food=meals[key]?.[t];
     const delBtn=food?`<button class="del-btn" onclick="deleteMeal('${key}','${t}')" title="Remove">✕</button>`:'';
-    body.innerHTML+=`<div class="meal-row"><div class="meal-row-hdr"><div class="meal-row-left"><div class="row-dot" style="background:${dot}"></div><div class="row-label">${lbl}</div></div>${delBtn}</div><div class="meal-val ${food?'':'empty'}">${food||'Nothing logged yet'}</div></div>`;
+    body.innerHTML+=`<div class="meal-row"><div class="meal-row-hdr"><div class="meal-row-left"><div class="row-dot" style="background:${dot}"></div><div class="row-label">${lbl}</div></div><div class="meal-actions"><button class="save-btn" onclick="saveMealFromInput('${key}','${t}')" title="Save">Save</button>${delBtn}</div></div><textarea id="meal-input-${t}" class="meal-input" rows="2" placeholder="Nothing logged yet">${food?escHtml(food):''}</textarea></div>`;
   });
 }
 

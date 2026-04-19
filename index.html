@@ -53,6 +53,9 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
 .pill.s{background:var(--s-bg);color:var(--s-txt)}
 .pill.d{background:var(--d-bg);color:var(--d-txt)}
 .right-panel{border-left:1px solid var(--border);background:var(--white);display:flex;flex-direction:column;height:calc(100vh - 60px);position:sticky;top:60px;overflow:hidden}
+.tab-bar{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab-btn{padding:12px 16px;font-size:13px;font-weight:500;color:var(--muted);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .12s}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
 .detail-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);flex-shrink:0}
 .detail-date{font-family:'Fraunces',serif;font-size:22px;font-weight:400;letter-spacing:-.4px;margin-bottom:2px}
 .detail-hint{font-size:12.5px;color:var(--muted)}
@@ -123,6 +126,10 @@ header{background:var(--white);border-bottom:1px solid var(--border);height:60px
   </div>
 
   <div class="right-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" id="mealsTab">Meals</button>
+      <button class="tab-btn" id="analysisTab">Analysis</button>
+    </div>
     <div class="detail-head">
       <div class="detail-date" id="detailDate">Select a day</div>
       <div class="detail-hint" id="detailHint">Click any date to see your meals</div>
@@ -143,6 +150,7 @@ const API_BASE = 'https://meal-planner-production-9ec1.up.railway.app'; // e.g. 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let meals = {};
 let curYear, curMonth, selDate;
+let activeTab = 'meals'; // 'meals' or 'analysis'
 const today = new Date();
 curYear = today.getFullYear();
 curMonth = today.getMonth();
@@ -172,18 +180,17 @@ function showError(show){
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
-async function fetchMeals(fromDate, toDate){
+async function fetchAnalysis(){
   setSyncing(true);
   try{
-    const url=`${API_BASE}/api/meals?from=${fromDate}&to=${toDate}`;
+    const url=`${API_BASE}/api/analysis`;
     const res=await fetch(url);
     if(!res.ok) throw new Error();
     const data=await res.json();
-    // Merge into local meals
-    Object.assign(meals, data);
-    showError(false);
+    return data;
   }catch{
     showError(true);
+    return null;
   }finally{
     setSyncing(false);
   }
@@ -195,7 +202,7 @@ async function deleteMeal(date, mealType){
     await fetch(`${API_BASE}/api/meals?date=${date}&meal_type=${mealType}`,{method:'DELETE'});
     if(meals[date]) delete meals[date][mealType];
     buildCalendar();
-    if(selDate===date){ const [,, d]=date.split('-'); renderDetail(date,parseInt(d)); }
+    if(selDate===date && activeTab === 'meals'){ updateRightPanel(); }
     showToast('Meal removed');
   }catch{ showToast('Failed to delete'); }
   finally{ setSyncing(false); }
@@ -221,7 +228,7 @@ async function saveMeal(date, mealType, food){
     if(!meals[date]) meals[date]={};
     meals[date][mealType]=value;
     buildCalendar();
-    if(selDate===date){ const [,, d]=date.split('-'); renderDetail(date,parseInt(d)); }
+    if(selDate===date && activeTab === 'meals'){ updateRightPanel(); }
     showToast(`${mealType.charAt(0).toUpperCase()+mealType.slice(1)} saved`);
   }catch{
     showToast('Failed to save meal');
@@ -286,10 +293,26 @@ function addCell(grid,dayNum,otherM,isToday,key){
 }
 
 function selectDate(key,day){
-  selDate=key; buildCalendar(); renderDetail(key,day);
+  selDate=key; buildCalendar(); updateRightPanel();
 }
 
-function renderDetail(key,day){
+function updateRightPanel(){
+  if(activeTab === 'meals'){
+    renderMeals(selDate);
+  } else if(activeTab === 'analysis'){
+    renderAnalysis();
+  }
+}
+
+function renderMeals(key){
+  if(!key){
+    document.getElementById('detailDate').textContent='Select a day';
+    document.getElementById('detailHint').textContent='Click any date to see your meals';
+    const body=document.getElementById('detailBody');
+    body.innerHTML='<div class="no-date">Click a date to view breakfast, lunch, snacks and dinner for that day</div>';
+    return;
+  }
+  const [,,day]=key.split('-').map(Number);
   const dateObj=new Date(curYear,curMonth,day);
   document.getElementById('detailDate').textContent=dateObj.toLocaleDateString('en-GB',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   document.getElementById('detailHint').textContent=meals[key]&&Object.keys(meals[key]).length?'Meals logged for this day':'No meals logged yet — use the fields above to log meals.';
@@ -300,6 +323,25 @@ function renderDetail(key,day){
     const delBtn=food?`<button class="del-btn" onclick="deleteMeal('${key}','${t}')" title="Remove">✕</button>`:'';
     body.innerHTML+=`<div class="meal-row"><div class="meal-row-hdr"><div class="meal-row-left"><div class="row-dot" style="background:${dot}"></div><div class="row-label">${lbl}</div></div><div class="meal-actions"><button class="save-btn" onclick="saveMealFromInput('${key}','${t}')" title="Save">Save</button>${delBtn}</div></div><textarea id="meal-input-${t}" class="meal-input" rows="2" placeholder="Nothing logged yet">${food?escHtml(food):''}</textarea></div>`;
   });
+}
+
+async function renderAnalysis(){
+  document.getElementById('detailDate').textContent='Meal Analysis Reports';
+  document.getElementById('detailHint').textContent='Overview of your meal patterns and insights';
+  const body=document.getElementById('detailBody');
+  body.innerHTML='<div style="text-align:center;padding:2rem;color:var(--muted)">Loading analysis...</div>';
+  const data = await fetchAnalysis();
+  if(!data){
+    body.innerHTML='<div style="text-align:center;padding:2rem;color:var(--muted)">Failed to load analysis reports.</div>';
+    return;
+  }
+  // Assuming data is an object with keys like totalMeals, favoriteFoods, etc.
+  let html = '<div style="padding:1rem">';
+  for(const [key, value] of Object.entries(data)){
+    html += `<div style="margin-bottom:1rem"><strong>${key}:</strong> ${value}</div>`;
+  }
+  html += '</div>';
+  body.innerHTML = html;
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
@@ -313,6 +355,16 @@ async function loadMonthData(){
 document.getElementById('prevBtn').addEventListener('click',async()=>{ if(--curMonth<0){curMonth=11;curYear--;} await loadMonthData(); });
 document.getElementById('nextBtn').addEventListener('click',async()=>{ if(++curMonth>11){curMonth=0;curYear++;} await loadMonthData(); });
 document.getElementById('todayBtn').addEventListener('click',async()=>{ curYear=today.getFullYear(); curMonth=today.getMonth(); await loadMonthData(); selectDate(todayKey(),today.getDate()); });
+
+document.getElementById('mealsTab').addEventListener('click', () => switchTab('meals'));
+document.getElementById('analysisTab').addEventListener('click', () => switchTab('analysis'));
+
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(tab + 'Tab').classList.add('active');
+  updateRightPanel();
+}
 
 // ── AUTO-REFRESH every 30 seconds (picks up WhatsApp-logged meals) ───────────
 setInterval(loadMonthData, 30000);
